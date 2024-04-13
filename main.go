@@ -2,15 +2,28 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
+	"net/http"
+	"wb/internal/controllers"
+	"wb/internal/repositories"
+	"wb/internal/service"
 	"wb/models"
 )
 
 func validate(err error, method string) {
 	if err != nil {
-		fmt.Println("Ошибка validate:", err)
+		if method == "connect" {
+			log.Fatal("Ошибка коннекта к базе:", err)
+		}
+		if method == "create_table_users" {
+			log.Fatal("Ошибка при создании таблицы:", err)
+		}
+		if method == "create_user" {
+			log.Fatal("Ошибка при создании пользователя:", err)
+		}
 	}
 }
 
@@ -20,18 +33,17 @@ func main() {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	validate(err, "connect")
 
-	// Автомиграция (автоматическое создание таблицы, если она не существует)
-	err = db.AutoMigrate(&models.User{})
-	if err != nil {
-		log.Fatal("Ошибка при создании таблицы:", err)
-	}
+	userService := service.NewUserServiceImpl(repositories.NewUserRepositoryImpl(db))
 
-	user := models.User{Name: "john_doe"}
-	result := db.Create(&user)
-	if result.Error != nil {
-		log.Fatal("Ошибка при создании пользователя:", result.Error)
-	}
-	log.Println("Создан пользователь:", user)
-	//Добавить метод validate у которого будет в аргументах err + название метода из которого вызывается
+	userService.CreateUser(&models.User{Name: "Elуууу"})
+	user := userService.GetUserByID(12)
 
+	fmt.Println(user.Name)
+
+	r := mux.NewRouter()
+	userController := controllers.NewUserControllerImpl(userService)
+
+	r.HandleFunc("/users", userController.CreateUserHandler).Methods("POST")
+
+	http.ListenAndServe(":8080", r)
 }
